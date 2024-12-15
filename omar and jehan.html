@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">   
+    <meta charset="UTF-8">
+    <link rel="shortcut icon" type="x-icon" href="FreeSample-Vectorizer-io-WhatsApp Image 2024-12-13 at 3.01.01 PM (2).png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> تهنئة عمر و جيهان</title>
+    <link rel="stylesheet" href="test.css"> <!-- ربط ملف CSS الخارجي -->
+</head>
+<body>
+    <header>
+        <h1> عمر و جيهان</h1>
+    </header>
+    <main>
+        <h2>أرسل تهنئتك بالكتابة</h2>
+        <input type="text" id="userName" placeholder="أدخل اسمك هنا..." required>
+        <textarea id="textMessage" placeholder="اكتب تهنئتك هنا..."></textarea>
+        <br>
+        <button onclick="saveTextMessage()">إرسال التهنئة</button>
+        <hr>
+        <h2>أرسل تهنئتك بالصوت</h2>
+        <div id="recordingControls">
+            <button id="startRecordingBtn" onclick="startRecording()">بدء التسجيل</button>
+            <button id="stopRecordingBtn" onclick="stopRecording()" disabled>إيقاف التسجيل</button>
+            <p id="recordingMessage" style="color: red; display: none;">يتم تسجيل الصوت... اضغط على زر "إيقاف التسجيل" عند الانتهاء.</p>
+        </div>
+        <div id="audioPlayer">
+            <audio id="audio" controls></audio>
+            <br>
+            <button id="saveAudioBtn" style="display:none;" onclick="saveAudioMessage()">حفظ التهنئة</button>
+        </div>
+        <br>
+    </main>
+
+    <!-- إعدادات المشرف في قسم منفصل -->
+    <div id="adminSection" class="hidden">
+        <h2>إعدادات المشرف</h2>
+        <div id="adminLogin">
+            <h3>تسجيل دخول المشرف</h3>
+            <input type="password" id="adminPassword" placeholder="أدخل كلمة المرور">
+            <br><br>
+            <button onclick="checkAdminLogin()">تسجيل الدخول</button>
+        </div>
+        <div id="adminActions" style="display: none;">
+            <button onclick="downloadAllMessages()">تحميل جميع التهاني</button>
+            <button onclick="clearAllMessages()">حذف جميع التهاني</button>
+        </div>
+    </div>
+
+    <!-- زر إظهار إعدادات المشرف -->
+    <div id="adminSettingsBtnWrapper">
+        <button id="adminSettingsBtn" onclick="showAdminLogin()">إعدادات المشرف</button>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        const allMessages = JSON.parse(localStorage.getItem('weddingMessages')) || [];
+
+        // Function to save a text message
+        function saveTextMessage() {
+            const userName = document.getElementById('userName').value;
+            const textMessage = document.getElementById('textMessage').value;
+            if (userName.trim() === "") {
+                alert('يرجى إدخال اسمك!');
+                return;
+            }
+            if (textMessage.trim() === "") {
+                alert('يرجى كتابة تهنئة قبل الإرسال!');
+                return;
+            }
+
+            const message = {
+                type: 'text',
+                name: userName,
+                content: textMessage,
+                timestamp: new Date().toLocaleString()
+            };
+            allMessages.push(message);
+            saveMessagesToLocalStorage();
+            alert('تم حفظ التهنئة النصية بنجاح!');
+            document.getElementById('userName').value = "";
+            document.getElementById('textMessage').value = "";
+        }
+
+        // Function to start recording audio
+        async function startRecording() {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.start();
+
+            document.getElementById('startRecordingBtn').disabled = true;
+            document.getElementById('startRecordingBtn').textContent = "إعادة التسجيل";
+            document.getElementById('stopRecordingBtn').disabled = false;
+
+            // Show the recording message
+            document.getElementById('recordingMessage').style.display = 'block';
+
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+
+                // Display the audio player with the recording
+                const audio = document.getElementById('audio');
+                audio.src = audioUrl;
+
+                // Enable save button
+                document.getElementById('saveAudioBtn').style.display = 'inline-block';
+
+                audioChunks = [];
+
+                // Hide the recording message
+                document.getElementById('recordingMessage').style.display = 'none';
+            };
+        }
+
+        // Function to stop recording audio
+        function stopRecording() {
+            mediaRecorder.stop();
+            document.getElementById('startRecordingBtn').disabled = false;
+            document.getElementById('stopRecordingBtn').disabled = true;
+
+            // Hide the recording message
+            document.getElementById('recordingMessage').style.display = 'none';
+        }
+
+        // Function to save audio message with name
+        function saveAudioMessage() {
+            const userName = document.getElementById('userName').value;  // Get user name
+            if (userName.trim() === "") {
+                alert('يرجى إدخال اسمك!');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                const base64Audio = reader.result.split(',')[1];  // Get the base64 encoded audio
+
+                // Create message object with name and audio
+                const message = {
+                    type: 'audio',
+                    name: userName,  // Store the name
+                    content: base64Audio,
+                    timestamp: new Date().toLocaleString()
+                };
+
+                // Save the message to the allMessages array and update localStorage
+                allMessages.push(message);
+                saveMessagesToLocalStorage();
+
+                alert('تم حفظ التهنئة الصوتية بنجاح!');
+                document.getElementById('saveAudioBtn').style.display = 'none';
+            };
+
+            reader.readAsDataURL(audioBlob);
+        }
+
+        // Function to save messages to local storage
+        function saveMessagesToLocalStorage() {
+            localStorage.setItem('weddingMessages', JSON.stringify(allMessages));
+        }
+
+        // Function to download all messages as an HTML file
+        function downloadAllMessages() {
+            if (allMessages.length === 0) {
+                alert('لا توجد تهانٍ لحفظها!');
+                return;
+            }
+
+            let htmlContent = `<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>جميع التهاني</title>
+</head>
+<body>
+    <h1>تهنئة العروسين عمر وجيهان</h1>
+    <ul>`;
+
+            allMessages.forEach(message => {
+                if (message.type === 'text') {
+                    htmlContent += `<li><strong>التاريخ:</strong> ${message.timestamp}<br><strong>الاسم:</strong> ${message.name}<br><strong>التهنئة:</strong> ${message.content}</li>`;
+                } else if (message.type === 'audio') {
+                    htmlContent += `<li><strong>التاريخ:</strong> ${message.timestamp}<br>
+                    <strong>الاسم:</strong> ${message.name}<br>
+                    <audio controls src="data:audio/wav;base64,${message.content}"></audio></li>`;
+                }
+            });
+
+            htmlContent += `</ul>
+</body>
+</html>`;
+
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'التهاني.html';
+            a.click();
+        }
+
+        // Function to clear all messages
+        function clearAllMessages() {
+            if (confirm('هل أنت متأكد أنك تريد حذف جميع التهاني؟')) {
+                localStorage.removeItem('weddingMessages');
+                alert('تم حذف جميع التهاني بنجاح!');
+                location.reload();
+            }
+        }
+
+        // Function to check admin login
+        function checkAdminLogin() {
+            const password = document.getElementById('adminPassword').value;
+            if (password === "9900554433#Ra") {
+                document.getElementById('adminLogin').style.display = 'none';
+                document.getElementById('adminActions').style.display = 'block';
+            } else {
+                alert('كلمة المرور غير صحيحة!');
+            }
+        }
+
+        // Function to show the admin login section
+        function showAdminLogin() {
+            document.getElementById('adminSection').style.display = 'block';  // Show admin section
+        }
+
+        // Restore messages on page load
+        window.onload = function() {
+            const adminLink = document.getElementById('hiddenAdminLink');
+            adminLink.style.display = 'block';
+        };
+    </script>
+</body>
+</html>
